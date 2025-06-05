@@ -96,7 +96,6 @@ async def rotate_status():
     await bot.change_presence(activity=discord.Activity(type=activity_type,
                                                         name=message),
                               status=discord.Status.online)
->>>>>> > 6e6910c962935793a0beef1dd29218596b906056
 
 
 # @bot.tree.command(name="help",
