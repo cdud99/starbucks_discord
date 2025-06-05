@@ -1,5 +1,10 @@
+from dotenv import load_dotenv
+import os
 import discord
 from discord.ext import commands
+
+load_dotenv()
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.message_content = True  # Required to read messages
@@ -16,4 +21,4 @@ async def on_ready():
 async def frap(ctx):
     await ctx.send("Here's your venti caramel frap with extra sass ☕️💅")
 
-bot.run("MTM4MDA1OTc1MzE3ODQ2NDMwNg.G7-8yq.o_5Hm0hT8P7lT80qog9GSMsruKTsGUVYqf97qo")
+bot.run(TOKEN)
