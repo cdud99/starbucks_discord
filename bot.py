@@ -22,7 +22,7 @@ async def frap(ctx):
     await ctx.send("Here's your venti caramel frap with extra sass ☕️💅")
 
 
-@bot.command(name="help")
+@bot.tree.commands(name="help")
 async def custom_help(ctx):
     help_text = """
 ☕ **FrapBot 9000 Commands** 🤖
