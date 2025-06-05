@@ -1,7 +1,9 @@
-from dotenv import load_dotenv
 import os
+import random
 import discord
-from discord.ext import commands
+from dotenv import load_dotenv
+from discord.ext import commands, tasks
+from keep_alive import keep_alive
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -9,35 +11,112 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True  # Required to read messages
 
+# keep_alive()
+
 bot = commands.Bot(command_prefix='!', intents=intents)
+bot.remove_command('help')
+
+# List of (ActivityType, message) tuples
+
+statuses = [
+    # Playing
+    (discord.ActivityType.playing, "with the espresso machine settings again"),
+    (discord.ActivityType.playing, "Minecraft while ignoring customers"),
+    (discord.ActivityType.playing, "barista simulator"),
+    (discord.ActivityType.playing, "hide and seek with customers"),
+    (discord.ActivityType.playing, "milk roulette"),
+    (discord.ActivityType.playing, "coffee pong in the backroom"),
+
+    # Watching
+    (discord.ActivityType.watching, "the beans run out"),
+    (discord.ActivityType.watching, "mobile orders wait"),
+    (discord.ActivityType.watching, "the shift lose it"),
+    (discord.ActivityType.watching, "my coworkers mentally clock out"),
+    (discord.ActivityType.watching, "a barista cry"),
+    (discord.ActivityType.watching, "you clean the bathroom again"),
+    (discord.ActivityType.watching, "TikToks during a rush"),
+
+    # Listening
+    (discord.ActivityType.listening, "to partners trauma dump"),
+    (discord.ActivityType.listening, "to “hi welcome in”"),
+    (discord.ActivityType.listening,
+     "to customer complaints about too much ice"),
+
+    # Competing
+    (discord.ActivityType.competing, "in Starbucks Hunger Games"),
+    (discord.ActivityType.competing,
+     "for Most Emotionally Stable Barista (lost)"),
+    (discord.ActivityType.competing,
+     "in today’s passive-aggressive shift showdown"),
+    (discord.ActivityType.competing, "for “who gets cut first” speedrun"),
+    (discord.ActivityType.competing, "in the 60-second milk restock race"),
+    (discord.ActivityType.competing, "for title of Bean King"),
+    (discord.ActivityType.competing, "against the laws of coffee"),
+
+    # Streaming
+    (discord.ActivityType.streaming, "Latte Speedruns LIVE"),
+    (discord.ActivityType.streaming, "Unhinged Barista Stories: Season 5"),
+    (discord.ActivityType.streaming, "Blender ASMR: Chaos Edition"),
+    (discord.ActivityType.streaming, "“How Not to Make a Frap” masterclass"),
+    (discord.ActivityType.streaming, "The Espresso Olympics"),
+    (discord.ActivityType.streaming, "1000 Orders, No Tips Challenge"),
+    (discord.ActivityType.streaming, "Shift Simulator 3000"),
+    (discord.ActivityType.streaming, "Brewing Trouble: Live"),
+    (discord.ActivityType.streaming, "The Great Customer Service Meltdown"),
+]
 
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user}')
+    await bot.wait_until_ready()
+    try:
+        synced = await bot.tree.sync()
+        print(f'Logged in as {bot.user}')
+        print(f"Synced {len(synced)} command(s).")
+        rotate_status.start()
+    except Exception as e:
+        print(f"Sync failed: {e}")
 
 
-@bot.command()
-async def frap(ctx):
-    await ctx.send("Here's your venti caramel frap with extra sass ☕️💅")
+@bot.event
+async def setup_hook():
+    # Load all cogs in the cogs folder
+    for filename in os.listdir('./cogs'):
+        if filename.endswith('.py'):
+            await bot.load_extension(f'cogs.{filename[:-3]}')
 
 
-@bot.command(name="help")
-async def custom_help(ctx):
-    help_text = """
-☕ **FrapBot 9000 Commands** 🤖
+@tasks.loop(seconds=3600)
+async def rotate_status():
+    activity_type, message = random.choice(statuses)
+    await bot.change_presence(activity=discord.Activity(type=activity_type,
+                                                        name=message),
+                              status=discord.Status.online)
 
-`!frap` - Get a random Starbucks drink with attitude
-`!mood` - Displays your daily shift mood
-`!tipjar` - Fake tipping leaderboard
-`!coords [name]` - Save Minecraft coordinates
-`!home [name]` - Retrieve saved home location
-`!killcount` - See who dies the most in-game
 
-Need help? Just scream into your apron. Or type `!help` again.
+# @bot.tree.command(name="help",
+#                   description="Displays all FrapBot 9000 commands")
+# async def help(interaction: discord.Interaction):
+#     embed = discord.Embed(
+#         title="☕ FrapBot 9000 – Command Menu 🤖",
+#         description="Here’s what I can do to make your coffee life easier:",
+#         color=0x6f4e37  # Coffee brown
+#     )
 
-✨ More features coming soon!
-    """
-    await ctx.send(help_text)
+#     embed.add_field(name="`/frap`",
+#                     value="Sends a sassy drink suggestion",
+#                     inline=False)
+#     embed.add_field(name="`/mood`",
+#                     value="Returns your current shift mood",
+#                     inline=False)
+#     embed.add_field(name="`/coords`",
+#                     value="Save/retrieve Minecraft coordinates",
+#                     inline=False)
+#     embed.add_field(name="`/killcount`",
+#                     value="See who’s dying the most (probably you)",
+#                     inline=False)
+#     embed.set_footer(text="Caffeinate responsibly | v1.0")
+
+#     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 bot.run(TOKEN)
