@@ -86,41 +86,11 @@ async def setup_hook():
             await bot.load_extension(f'cogs.{filename[:-3]}')
 
 
-☕ **FrapBot 9000 Commands** 🤖
-== == == =
-
-
 @tasks.loop(seconds=3600)
 async def rotate_status():
     activity_type, message = random.choice(statuses)
     await bot.change_presence(activity=discord.Activity(type=activity_type,
                                                         name=message),
                               status=discord.Status.online)
-
-
-# @bot.tree.command(name="help",
-#                   description="Displays all FrapBot 9000 commands")
-# async def help(interaction: discord.Interaction):
-#     embed = discord.Embed(
-#         title="☕ FrapBot 9000 – Command Menu 🤖",
-#         description="Here’s what I can do to make your coffee life easier:",
-#         color=0x6f4e37  # Coffee brown
-#     )
-
-#     embed.add_field(name="`/frap`",
-#                     value="Sends a sassy drink suggestion",
-#                     inline=False)
-#     embed.add_field(name="`/mood`",
-#                     value="Returns your current shift mood",
-#                     inline=False)
-#     embed.add_field(name="`/coords`",
-#                     value="Save/retrieve Minecraft coordinates",
-#                     inline=False)
-#     embed.add_field(name="`/killcount`",
-#                     value="See who’s dying the most (probably you)",
-#                     inline=False)
-#     embed.set_footer(text="Caffeinate responsibly | v1.0")
-
-#     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 bot.run(TOKEN)
