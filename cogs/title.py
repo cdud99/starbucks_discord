@@ -12,6 +12,7 @@ class TitleCog(commands.Cog):
         self.bot = bot
 
     # /title command
+    @app_commands.default_permissions(administrator=True)
     @app_commands.command(
         name="title", description="Give a user a visible server title (role)")
     @app_commands.describe(member="Who to give the title to",
@@ -34,6 +35,7 @@ class TitleCog(commands.Cog):
             ephemeral=False)
 
     # /create_title command
+    @app_commands.default_permissions(administrator=True)
     @app_commands.command(
         name="create_title",
         description="Create a new role to use as a server title")
@@ -74,6 +76,7 @@ class TitleCog(commands.Cog):
             f"✅ Created title role: **{role_name}**", ephemeral=True)
 
     # /edit_title command
+    @app_commands.default_permissions(administrator=True)
     @app_commands.command(name="edit_title",
                           description="Edit an existing title (role)")
     @app_commands.describe(

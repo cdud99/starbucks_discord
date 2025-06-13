@@ -12,6 +12,7 @@ class Frap(commands.Cog):
 
     @app_commands.command(name="drink",
                           description="Get a sassy drink suggestion")
+    @app_commands.default_permissions()
     async def drink(self, interaction: discord.Interaction):
         drinks = [
             "Venti Caramel Frappuccino with whipped cream and extra guilt",
@@ -29,7 +30,7 @@ class Frap(commands.Cog):
             "Chai Creme Frap for the person who reads horoscopes religiously",
             "Triple blended mocha with ‘trauma’ spelled in caramel on the lid",
             "Strawberry Açaí Refresher, but somehow it’s beige",
-            "Green Tea Frap that’s 90% syrup and 10% self-control",
+            "Green Tea Frap that’s 90%% syrup and 10%% self-control",
             "Decaf Frap — for when you’ve given up on life *and* caffeine",
             "Iced White Mocha in a blender with 12 pumps of entitlement",
             "Frappuccino with no ice, no milk, and no point",
@@ -58,7 +59,7 @@ class Frap(commands.Cog):
             "Frozen matcha blended with your manager’s lies",
             "Frappuccino made with tears of the last barista who asked for a raise",
             "Blended dragonfruit and spite — the shift supervisor’s special",
-            "Grande Frap that’s 10% coffee, 90% coping mechanism",
+            "Grande Frap that’s 10%% coffee, 90%% coping mechanism",
             "Pink Drink blended and served with a passive-aggressive straw",
             "Syrup and ice in a blender: the Karen Special",
             "Frappuccino labeled 'Chris' even though your name is Sarah",

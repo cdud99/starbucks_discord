@@ -48,6 +48,7 @@ class WriteupCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    @app_commands.default_permissions(administrator=True)
     @app_commands.command(name="writeup",
                           description="Give a user a formal write-up")
     @app_commands.describe(member="The user to write up",
@@ -58,11 +59,14 @@ class WriteupCog(commands.Cog):
         add_writeup(member.id, reason)
         data = get_writeups(member.id)
         await interaction.response.send_message(
-            f"✍️ `{member.display_name}` has been written up for: *{reason}*\n📄 `{member.display_name}` now has **{data['count']}** write-up(s)."
+            f"✍️ `{member.display_name}` has been written up for: \
+            *{reason}*\n📄 `{member.display_name}` now has\
+             **{data['count']}** write-up(s)."
         )
 
     @app_commands.command(name="check_writeups",
-                          description="View a user's write-up history")
+                          description="View a user's write-up history"
+                          )
     @app_commands.describe(member="The member to check")
     async def check_writeups(self, interaction: discord.Interaction,
                              member: discord.Member):

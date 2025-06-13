@@ -13,6 +13,7 @@ from discord.ui import View, Button, Modal, TextInput
 DATA_FILE = "channel_requests.json"
 LAST_REQUEST_FILE = "last_requests.json"
 CHANNEL_FILE = "channel_data.json"
+PENDING_REQUESTS_FILE = "pending_requests.json"
 
 
 def load_last_requests():
@@ -32,7 +33,7 @@ def save_last_requests(data):
 
 def load_channel_data():
     if os.path.exists(CHANNEL_FILE):
-        with open(CHENNEL_FILE, "r") as f:
+        with open(CHANNEL_FILE, "r") as f:
             return json.load(f)
     return {}
 
@@ -69,6 +70,42 @@ def save_pending_requests(data):
 request_log_data = load_request_data()
 
 
+async def build_request_embed(bot, data_key):
+    data = request_log_data[data_key]
+    guild = bot.get_guild(data['guild_id'])
+    timestamp = datetime.datetime.strptime(
+        data['timestamp'], '%Y-%m-%d %H:%M UTC')
+    user = await guild.fetch_member(data["user_id"])
+    request_embed = discord.Embed(
+        title="📨 New Channel Request",
+        description=f'**From:** {user.mention}\n**Requested At:\
+            ** {timestamp.strftime(" % Y - %m - %d % H: % M UTC")}',
+        color=discord.Color.orange())
+    request_embed.add_field(name="Channel Name",
+                            value=data['channel_name'],
+                            inline=False)
+    request_embed.add_field(name="Reason",
+                            value=data['reason'],
+                            inline=False)
+    request_embed.add_field(name="Access Type",
+                            value=data['access_type'],
+                            inline=True)
+    request_embed.add_field(name="Channel Type",
+                            value=data['channel_type'],
+                            inline=False)
+    if 'approved' in request_log_data[data_key]:
+        request_embed.add_field(name="Approved",
+                                value=request_log_data[data_key]['approved'],
+                                inline=False)
+    if 'denial_reason' in request_log_data[data_key]:
+        request_embed.add_field(name="Denial Reason",
+                                value=request_log_data[data_key]
+                                ['denial_reason'],
+                                inline=False)
+
+    return request_embed
+
+
 class ChannelRequestModal(Modal, title="📋 Channel Request Form"):
 
     def __init__(self, bot, user):
@@ -78,47 +115,34 @@ class ChannelRequestModal(Modal, title="📋 Channel Request Form"):
         self.channel_name = TextInput(label="Channel Name",
                                       placeholder="ex: minecraft",
                                       max_length=32)
-        self.title_name = TextInput(label="Title Name",
-                                    placeholder="ex: Minecrafter",
-                                    max_length=32)
         self.reason = TextInput(label="What’s this channel for?",
                                 style=discord.TextStyle.paragraph)
         self.access = TextInput(label="Access Type (public or private)",
                                 placeholder="public or private")
-        # self.moderator = TextInput(label="Do you want to be a mod? (yes/no)",
-        #                            placeholder="yes or no")
         self.channel_type = TextInput(label="Channel Type (text, voice, both)",
                                       placeholder="text, voice, or both")
         self.add_item(self.channel_name)
-        self.add_item(self.title_name)
         self.add_item(self.reason)
         self.add_item(self.access)
-        # self.add_item(self.moderator)
         self.add_item(self.channel_type)
 
     async def on_submit(self, interaction: discord.Interaction):
         channel_name = self.channel_name.value.lower()
         channel_name = channel_name.replace(' ', '')
         access_type = self.access.value.lower()
-        # mod_choice = self.moderator.value.lower()
-        mod_choice = "yes"
-        channel_kind = self.channel_type.value.lower()
+        channel_type = self.channel_type.value.lower()
 
         if access_type not in ["public", "private"]:
             await interaction.response.send_message(
                 "❌ Invalid access type. Please use 'public' or 'private'.",
                 ephemeral=True)
             return
-
-        if mod_choice not in ["yes", "no"]:
-            await interaction.response.send_message(
-                "❌ Invalid mod choice. Please answer 'yes' or 'no'.",
-                ephemeral=True)
             return
 
-        if channel_kind not in ["text", "voice", "both"]:
+        if channel_type not in ["text", "voice", "both"]:
             await interaction.response.send_message(
-                "❌ Invalid channel type. Please use 'text', 'voice', or 'both'.",
+                "❌ Invalid channel type. Please use 'text', 'voice', or \
+                    'both'.",
                 ephemeral=True)
             return
 
@@ -126,46 +150,31 @@ class ChannelRequestModal(Modal, title="📋 Channel Request Form"):
                                         name="owner")
         now = datetime.datetime.utcnow()
 
-        request_embed = discord.Embed(
-            title="📨 New Channel Request",
-            description=
-            f"**From:** {self.user.mention}\n**Requested At:** {now.strftime('%Y-%m-%d %H:%M UTC')}",
-            color=discord.Color.orange())
-        request_embed.add_field(name="Channel Name",
-                                value=channel_name,
-                                inline=False)
-        request_embed.add_field(name="Title Name",
-                                value=self.title_name.value,
-                                inline=False)
-        request_embed.add_field(name="Reason",
-                                value=self.reason.value,
-                                inline=False)
-        request_embed.add_field(name="Access Type",
-                                value=access_type,
-                                inline=True)
-        request_embed.add_field(name="Wants Mod?",
-                                value=mod_choice,
-                                inline=True)
-        request_embed.add_field(name="Channel Type",
-                                value=channel_kind,
-                                inline=False)
-
         data_key = str(now.timestamp())
         request_log_data[data_key] = {
+            'guild_id': interaction.guild.id,
             "user": self.user.name,
             "user_id": self.user.id,
             "channel_name": channel_name,
-            "title_name": self.title_name.value,
             "reason": self.reason.value,
             "access_type": access_type,
-            "wants_mod": mod_choice,
-            "channel_type": channel_kind,
+            "channel_type": channel_type,
             "timestamp": now.strftime('%Y-%m-%d %H:%M UTC')
         }
         save_request_data(request_log_data)
 
-        await log_channel.send(embed=request_embed,
-                               view=RequestApprovalView(data_key))
+        request_embed = await build_request_embed(self.bot, data_key)
+        sent_msg = await log_channel.send(embed=request_embed,
+                                          view=RequestApprovalView(
+                                              self.bot, data_key))
+
+        pending = load_pending_requests()
+        pending[str(log_channel.id)] = {
+            'message_id': sent_msg.id,
+            'data_key': data_key
+        }
+        save_pending_requests(pending)
+
         await interaction.response.send_message(
             "✅ Your request has been sent for approval! Stay tuned...",
             ephemeral=True)  # Save request time persistently
@@ -178,12 +187,14 @@ class ChannelRequestModal(Modal, title="📋 Channel Request Form"):
 
 class RequestApprovalView(View):
 
-    def __init__(self, data_key):
+    def __init__(self, bot, data_key):
         super().__init__(timeout=None)
+        self.bot = bot
         self.data_key = data_key
         self.data = request_log_data[self.data_key]
 
-    @discord.ui.button(label="✅ Approve", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ Approve", style=discord.ButtonStyle.success,
+                       custom_id="approve_button")
     async def approve(self, interaction: discord.Interaction,
                       button: discord.ui.Button):
         guild = interaction.guild
@@ -193,7 +204,8 @@ class RequestApprovalView(View):
             discord.PermissionOverwrite(read_messages=False),
         }
 
-        role = await guild.create_role(name=f"{self.data['title_name']}")
+        role = await guild.create_role(
+            name=f"{self.data['channel_name']}-access")
         overwrites[role] = discord.PermissionOverwrite(read_messages=True,
                                                        send_messages=True)
 
@@ -206,6 +218,9 @@ class RequestApprovalView(View):
                 overwrites=overwrites,
                 category=discord.utils.get(guild.categories,
                                            name="🧃 Barista Banter"))
+            await new_text_channel.set_permissions(self.requester,
+                                                   manage_messages=True,
+                                                   manage_channels=True)
 
         if self.data['channel_type'] in ['voice', 'both']:
             new_voice_channel = await guild.create_voice_channel(
@@ -213,95 +228,68 @@ class RequestApprovalView(View):
                 overwrites=overwrites,
                 category=discord.utils.get(guild.categories,
                                            name="📞 Barista Hotline"))
+            await new_voice_channel.set_permissions(self.requester,
+                                                    manage_channels=True,
+                                                    mute_members=True,
+                                                    move_members=True)
 
-        if self.data['wants_mod'].startswith("y"):
-            if new_text_channel:
-                await new_text_channel.set_permissions(self.requester,
-                                                       manage_messages=True,
-                                                       manage_channels=True)
-            if new_voice_channel:
-                await new_voice_channel.set_permissions(self.requester,
-                                                        manage_channels=True,
-                                                        mute_members=True,
-                                                        move_members=True)
-
-        await self.requester.add_roles(role)
+        await self.requester.add_roles(role, self.data['channel_name'])
 
         general_channel = discord.utils.get(guild.text_channels, name="owner")
-        join_view = JoinChannelView(role)
         await general_channel.send(
-            f"☕ A new channel **#{self.data['channel_name']}** has been brewed! Click below to join.",
-            view=join_view)
+            f"☕ A new channel **#{self.data['channel_name']}** has been \
+                brewed! Click below to join.",
+            view=JoinChannelView(role))
         await interaction.response.send_message(
             "☕ Channel approved and created!", ephemeral=True)
         await self.requester.send(
-            f"✅ Your channel **#{self.data['channel_name']}** was approved and created!"
+            f"✅ Your channel **#{self.data['channel_name']}** was approved \
+                and created! You are a moderator for this channel and can \
+                view your commands using `/help` in your channel."
         )
 
-        if self.data['wants_mod'].startswith("y"):
-            cheat_sheet = discord.Embed(
-                title="📘 Mod Command Cheat Sheet",
-                description=
-                "Welcome, freshly appointed mod! Here are your tools:",
-                color=discord.Color.blue())
-            cheat_sheet.add_field(name="/invite_to_channel @user",
-                                  value="Invite someone into your channel",
-                                  inline=False)
-            cheat_sheet.add_field(name="/remove_from_channel @user",
-                                  value="Boot someone out of your channel",
-                                  inline=False)
-            cheat_sheet.set_footer(text="Keep it clean, keep it sassy. ☕")
-            await self.requester.send(embed=cheat_sheet)
-            request_log_data[self.data_key]
-            save_request_data(request_log_data)
+        request_log_data[self.data_key]
+        save_request_data(request_log_data)
 
-            channel_data = load_channel_data()
-            channel_data[self.data['channel_name']] = {
-                'title_name': self.data['title_name'],
-            }
-            save_channel_data(channel_data)
+        channel_data = load_channel_data()
+        channel_data[self.data['channel_name']] = {
+            # 'title_name': self.data['title_name'],
+            'title_name': f'{self.data["channel_name"]}-access',
+            'text_channel': self.data['channel_type'] in ['text', 'both'],
+            'voice_channel': self.data['channel_type'] in ['voice', 'both']
+        }
+        save_channel_data(channel_data)
 
-            now = datetime.datetime.utcnow()
-            request_embed = discord.Embed(
-                title="📨 New Channel Request",
-                description=
-                f"**From:** {self.requester.mention}\n**Requested At:** {now.strftime('%Y-%m-%d %H:%M UTC')}",
-                color=discord.Color.orange())
-            request_embed.add_field(name="Channel Name",
-                                    value=self.data['channel_name'],
-                                    inline=False)
-            request_embed.add_field(name="Title Name",
-                                    value=self.data['title_name'],
-                                    inline=False)
-            request_embed.add_field(name="Reason",
-                                    value=self.data['reason'],
-                                    inline=False)
-            request_embed.add_field(name="Access Type",
-                                    value=self.data['access_type'],
-                                    inline=True)
-            request_embed.add_field(name="Wants Mod?",
-                                    value=self.data['wants_mod'],
-                                    inline=True)
-            request_embed.add_field(name="Channel Type",
-                                    value=self.data['channel_type'],
-                                    inline=False)
-            request_embed.add_field(name="Approved", value='yes', inline=False)
-            await interaction.message.edit(embed=request_embed, view=None)
+        request_log_data[self.data_key]['approved'] = 'Yes'
+        save_request_data(request_log_data)
 
-    @discord.ui.button(label="❌ Deny", style=discord.ButtonStyle.danger)
+        request_embed = await build_request_embed(self.bot, self.data_key)
+        await interaction.message.edit(embed=request_embed, view=None)
+        self._cleanup_pending(interaction.message.channel.id)
+
+    @discord.ui.button(label="❌ Deny", style=discord.ButtonStyle.danger,
+                       custom_id="deny_button")
     async def deny(self, interaction: discord.Interaction,
                    button: discord.ui.Button):
         self.data = request_log_data[self.data_key]
         self.requester = await interaction.guild.fetch_member(
             self.data["user_id"])
         await interaction.response.send_modal(
-            DenyReasonModal(self.requester, self.data_key, interaction))
+            DenyReasonModal(self.bot, self.requester, self.data_key,
+                            interaction))
+        self._cleanup_pending(interaction.message.channel.id)
+
+    def _cleanup_pending(self, channel_id):
+        pending = load_pending_requests()
+        pending.pop(str(channel_id), None)
+        save_pending_requests(pending)
 
 
 class DenyReasonModal(Modal, title="Why Deny This?"):
 
-    def __init__(self, requester, data_key, interaction):
+    def __init__(self, bot, requester, data_key, interaction):
         super().__init__()
+        self.bot = bot
         self.requester = requester
         self.reason = TextInput(label="Reason for denial",
                                 style=discord.TextStyle.paragraph)
@@ -313,38 +301,11 @@ class DenyReasonModal(Modal, title="Why Deny This?"):
     async def on_submit(self, interaction: discord.Interaction):
         await self.requester.send(
             f"❌ Your channel request was denied. Reason: {self.reason.value}")
-        request_log_data[self.data_key]['approved'] = 'no'
-        request_log_data[self.data_key]['approval_reason'] = self.reason.value
+        request_log_data[self.data_key]['approved'] = 'No'
+        request_log_data[self.data_key]['denial_reason'] = self.reason.value
         save_request_data(request_log_data)
 
-        now = datetime.datetime.utcnow()
-        request_embed = discord.Embed(
-            title="📨 New Channel Request",
-            description=
-            f"**From:** {self.requester.mention}\n**Requested At:** {now.strftime('%Y-%m-%d %H:%M UTC')}",
-            color=discord.Color.orange())
-        request_embed.add_field(name="Channel Name",
-                                value=self.data['channel_name'],
-                                inline=False)
-        request_embed.add_field(name="Title Name",
-                                value=self.data['title_name'],
-                                inline=False)
-        request_embed.add_field(name="Reason",
-                                value=self.data['reason'],
-                                inline=False)
-        request_embed.add_field(name="Access Type",
-                                value=self.data['access_type'],
-                                inline=True)
-        request_embed.add_field(name="Wants Mod?",
-                                value=self.data['wants_mod'],
-                                inline=True)
-        request_embed.add_field(name="Channel Type",
-                                value=self.data['channel_type'],
-                                inline=False)
-        request_embed.add_field(name="Approved", value='no', inline=False)
-        request_embed.add_field(name="Approval Reason",
-                                value=self.reason.value,
-                                inline=False)
+        request_embed = await build_request_embed(self.bot, self.data_key)
         await interaction.message.edit(embed=request_embed, view=None)
 
         await interaction.response.send_message(
@@ -356,13 +317,15 @@ class JoinChannelView(View):
     def __init__(self, role):
         super().__init__(timeout=None)
         self.role = role
+        self.channel = channel
 
     @discord.ui.button(label="Join Channel", style=discord.ButtonStyle.primary)
     async def join(self, interaction: discord.Interaction,
                    button: discord.ui.Button):
         await interaction.user.add_roles(self.role)
         await interaction.response.send_message(
-            f"✅ You now have access to **#{self.role.name.replace('-access','')}**!",
+            f"✅ You now have the title **{self.role.name}** and access to \
+                **#{self.channel}!",
             ephemeral=True)
 
 
@@ -371,9 +334,25 @@ class ChannelManager(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.user_last_request = load_last_requests()
+        self.bot.loop.create_task(self.restore_pending_views())
+
+    async def restore_pending_views(self):
+        await self.bot.wait_until_ready()
+        pending = load_pending_requests()
+        for channel_id_str, data in pending.items():
+            message_id = data['message_id']
+            data_key = data['data_key']
+            channel = self.bot.get_channel(int(channel_id_str))
+            if channel:
+                try:
+                    await channel.fetch_message(message_id)
+                    self.bot.add_view(
+                        RequestApprovalView(self.bot, data_key))
+                except discord.NotFound:
+                    continue
 
     @app_commands.command(name="request_channel",
-                          description="Request a new text channel")
+                          description="Request a new channel")
     async def request_channel(self, interaction: discord.Interaction):
         now = datetime.datetime.utcnow()
         last = self.user_last_request.get(interaction.user.id,
@@ -386,6 +365,7 @@ class ChannelManager(commands.Cog):
         await interaction.response.send_modal(
             ChannelRequestModal(self.bot, interaction.user))
 
+    @app_commands.default_permissions(administrator=True)
     @app_commands.command(
         name="reset_channel_cooldown",
         description="Reset a user's channel request cooldown")
@@ -404,8 +384,9 @@ class ChannelManager(commands.Cog):
             await interaction.response.send_message(
                 f"ℹ️ No cooldown found for {target.mention}.", ephemeral=True)
 
+    @app_commands.default_permissions(manage_channels=True)
     @app_commands.command(name="invite_to_channel",
-                          description="Invite a user to your modded channel")
+                          description="Invite a user to the channel")
     async def invite_to_channel(self, interaction: discord.Interaction,
                                 member: discord.Member):
         channel_data = load_channel_data()
@@ -422,8 +403,9 @@ class ChannelManager(commands.Cog):
             "❌ You must be a mod in this channel to invite users.",
             ephemeral=True)
 
+    @app_commands.default_permissions(manage_channels=True)
     @app_commands.command(name="remove_from_channel",
-                          description="Remove a user from your modded channel")
+                          description="Remove a user from the channel")
     async def remove_from_channel(self, interaction: discord.Interaction,
                                   member: discord.Member):
         channel_data = load_channel_data()
@@ -439,6 +421,51 @@ class ChannelManager(commands.Cog):
         await interaction.response.send_message(
             "❌ You must be a mod in this channel to remove users.",
             ephemeral=True)
+
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.command(name='remove_channel',
+                          description='Remove a channel')
+    async def remove_channel(
+            self, interaction: discord.Interaction, channel: str):
+        channel_data = load_channel_data()
+        if channel in channel_data:
+            entry = channel_data[channel]
+            deleted = []
+
+            # Try to delete text channel
+            if entry.get("text_channel"):
+                text = discord.utils.get(
+                    interaction.guild.text_channels, name=channel)
+                if text:
+                    await text.delete(reason=f"Deleted by {interaction.user}")
+                    deleted.append(f"📄 #{channel}")
+
+            # Try to delete voice channel
+            if entry.get("voice_channel"):
+                voice = discord.utils.get(
+                    interaction.guild.voice_channels, name=channel)
+                if voice:
+                    await voice.delete(reason=f"Deleted by {interaction.user}")
+                    deleted.append(f"🔊 {channel} (voice)")
+
+            # Delete associated role
+            role = discord.utils.get(
+                interaction.guild.roles, name=entry['title_name'])
+            if role:
+                await role.delete(reason=f"Deleted by {interaction.user}")
+                deleted.append(f"👥 {role.name}")
+
+            # Remove from JSON
+            del channel_data[channel]
+            save_channel_data(channel_data)
+
+            if deleted:
+                await interaction.response.send_message(
+                    f"✅ Deleted:\n" + "\n".join(deleted), ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    "⚠️ No matching channels or roles found.", ephemeral=True)
+        return
 
 
 async def setup(bot):

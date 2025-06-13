@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 from discord.ext import commands, tasks
 from keep_alive import keep_alive
 
+import certifi
+os.environ["SSL_CERT_FILE"] = certifi.where()
+
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
