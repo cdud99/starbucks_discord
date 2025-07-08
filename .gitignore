@@ -1,6 +1,2 @@
 .env
-channel_data.json
-channel_requests.json
-last_requests.json
-pending_requests.json
-writeups.json
+*.json
