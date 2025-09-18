@@ -78,8 +78,7 @@ async def build_request_embed(bot, data_key):
     user = await guild.fetch_member(data["user_id"])
     request_embed = discord.Embed(
         title="📨 New Channel Request",
-        description=f'**From:** {user.mention}\n**Requested At:\
-            ** {timestamp.strftime(" % Y - %m - %d % H: % M UTC")}',
+        description=f'**From:** {user.mention}\n**Requested At: ** {timestamp.strftime(" % Y - %m - %d % H: % M UTC")}',
         color=discord.Color.orange())
     request_embed.add_field(name="Channel Name",
                             value=data['channel_name'],
@@ -141,14 +140,13 @@ class ChannelRequestModal(Modal, title="📋 Channel Request Form"):
 
         if channel_type not in ["text", "voice", "both"]:
             await interaction.response.send_message(
-                "❌ Invalid channel type. Please use 'text', 'voice', or \
-                    'both'.",
+                "❌ Invalid channel type. Please use 'text', 'voice', or 'both'.",
                 ephemeral=True)
             return
 
         log_channel = discord.utils.get(interaction.guild.text_channels,
                                         name="owner")
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
 
         data_key = str(now.timestamp())
         request_log_data[data_key] = {
@@ -207,7 +205,10 @@ class RequestApprovalView(View):
         role = await guild.create_role(
             name=f"{self.data['channel_name']}-access")
         overwrites[role] = discord.PermissionOverwrite(read_messages=True,
-                                                       send_messages=True)
+                                                       send_messages=True,
+                                                       view_channel=True,
+                                                       connect=True,
+                                                       speak=True)
 
         new_text_channel = None
         new_voice_channel = None
@@ -233,20 +234,23 @@ class RequestApprovalView(View):
                                                     mute_members=True,
                                                     move_members=True)
 
-        await self.requester.add_roles(role, self.data['channel_name'])
+        await self.requester.add_roles(role)
 
-        general_channel = discord.utils.get(guild.text_channels, name="owner")
-        await general_channel.send(
-            f"☕ A new channel **#{self.data['channel_name']}** has been \
-                brewed! Click below to join.",
-            view=JoinChannelView(role))
+        general_channel = discord.utils.get(
+            guild.text_channels, name="general")
+        if self.data['access_type'] == 'public':
+            await general_channel.send(
+                f"☕ A new channel **#{self.data['channel_name']}** has been brewed! Click below to join.",
+                view=JoinChannelView(role, self.data['channel_name']))
         await interaction.response.send_message(
             "☕ Channel approved and created!", ephemeral=True)
-        await self.requester.send(
-            f"✅ Your channel **#{self.data['channel_name']}** was approved \
-                and created! You are a moderator for this channel and can \
-                view your commands using `/help` in your channel."
-        )
+        approval_message = f'''
+            ✅ Your channel **#{self.data["channel_name"]}** was approved and
+            created! You are a moderator for this channel and can view your
+            commands by typing `/help` in your channel.
+        '''
+        approval_message = approval_message.replace('\n', ' ')
+        await self.requester.send(approval_message)
 
         request_log_data[self.data_key]
         save_request_data(request_log_data)
@@ -314,7 +318,7 @@ class DenyReasonModal(Modal, title="Why Deny This?"):
 
 class JoinChannelView(View):
 
-    def __init__(self, role):
+    def __init__(self, role, channel):
         super().__init__(timeout=None)
         self.role = role
         self.channel = channel
@@ -324,9 +328,50 @@ class JoinChannelView(View):
                    button: discord.ui.Button):
         await interaction.user.add_roles(self.role)
         await interaction.response.send_message(
-            f"✅ You now have the title **{self.role.name}** and access to \
-                **#{self.channel}!",
+            f"✅ You now have the title **{self.role.name}** and access to **#{self.channel}!",
             ephemeral=True)
+
+
+class SettingsModal(discord.ui.Modal, title="⚙️ Channel Settings"):
+    def __init__(self, bot, roles, channel):
+        super().__init__()
+        # self.bot = bot
+        self.roles = roles
+        self.channel = channel
+        self.data = load_channel_data()
+        self.current_title_name = self.data[channel.name]['title_name']
+        title = discord.utils.get(roles, name=self.current_title_name)
+        current_title_color = f"#{title.color.value:06x}"
+        self.title_name = discord.ui.TextInput(
+            label="Title Name",
+            default=self.data[channel.name]['title_name'],
+            max_length=32
+        )
+        self.title_color = discord.ui.TextInput(
+            label="Title Color (Hex)",
+            default=current_title_color,
+            required=False
+        )
+        self.add_item(self.title_name)
+        self.add_item(self.title_color)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        name = self.title_name.value.strip()
+        color = self.title_color.value.strip()
+
+        # Attempt to parse the hex color
+        try:
+            role_color = discord.Color(int(color.replace("#", ""), 16))
+        except ValueError:
+            await interaction.response.send_message("❌ Invalid hex color. Use something like `#00FFFF` (Tiel).", ephemeral=True)
+            return
+
+        title = discord.utils.get(self.roles, name=self.current_title_name)
+        await title.edit(name=name, color=role_color, reason=f"Updated by {interaction.user}")
+        self.data[self.channel.name]["title_name"] = name
+        save_channel_data(self.data)
+
+        await interaction.response.send_message(f"✅ Title updated to **{name}** with color `{color or 'default'}`.", ephemeral=True)
 
 
 class ChannelManager(commands.Cog):
@@ -354,7 +399,7 @@ class ChannelManager(commands.Cog):
     @app_commands.command(name="request_channel",
                           description="Request a new channel")
     async def request_channel(self, interaction: discord.Interaction):
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         last = self.user_last_request.get(interaction.user.id,
                                           datetime.datetime.min)
         if (now - last).total_seconds() < 86400:
@@ -466,6 +511,23 @@ class ChannelManager(commands.Cog):
                 await interaction.response.send_message(
                     "⚠️ No matching channels or roles found.", ephemeral=True)
         return
+
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.command(name="channel_settings",
+                          description="Modify channel settings")
+    async def channel_settings(self, interaction: discord.Interaction):
+        data = load_channel_data()
+        if not interaction.channel.permissions_for(
+                interaction.user).manage_channels:
+            await interaction.response.send_message(
+                "❌ You must be a mod to use this command.",
+                ephemeral=True)
+            return
+
+        await interaction.response.send_modal(
+            SettingsModal(self.bot, interaction.guild.roles,
+                          interaction.channel)
+        )
 
 
 async def setup(bot):

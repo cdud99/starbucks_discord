@@ -1,1 +1,7 @@
-{}
+{
+    "minecraft": {
+        "title_name": "\u26cf\ufe0f Minecrafter",
+        "text_channel": true,
+        "voice_channel": true
+    }
+}

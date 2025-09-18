@@ -300,5 +300,58 @@
         "timestamp": "2025-06-13 22:29 UTC",
         "approved": "No",
         "denial_reason": "No"
+    },
+    "1749879532.46541": {
+        "guild_id": 1379621780746010684,
+        "user": "everydayboss",
+        "user_id": 396904850899861505,
+        "channel_name": "minecraft",
+        "reason": "Minecraft",
+        "access_type": "public",
+        "channel_type": "both",
+        "timestamp": "2025-06-13 22:38 UTC"
+    },
+    "1749879792.44936": {
+        "guild_id": 1379621780746010684,
+        "user": "everydayboss",
+        "user_id": 396904850899861505,
+        "channel_name": "minecraft",
+        "reason": "Minecraft",
+        "access_type": "private",
+        "channel_type": "both",
+        "timestamp": "2025-06-13 22:43 UTC",
+        "approved": "Yes"
+    },
+    "1749879843.144247": {
+        "guild_id": 1379621780746010684,
+        "user": "everydayboss",
+        "user_id": 396904850899861505,
+        "channel_name": "minecraft",
+        "reason": "Minecraft",
+        "access_type": "public",
+        "channel_type": "both",
+        "timestamp": "2025-06-13 22:44 UTC"
+    },
+    "1749880299.750667": {
+        "guild_id": 1379621780746010684,
+        "user": "everydayboss",
+        "user_id": 396904850899861505,
+        "channel_name": "minecraft",
+        "reason": "Minecraft",
+        "access_type": "public",
+        "channel_type": "both",
+        "timestamp": "2025-06-13 22:51 UTC",
+        "approved": "Yes"
+    },
+    "1749886148.260913": {
+        "guild_id": 1379621780746010684,
+        "user": "everydayboss",
+        "user_id": 396904850899861505,
+        "channel_name": "minecraft",
+        "reason": "Minecraft players",
+        "access_type": "public",
+        "channel_type": "both",
+        "timestamp": "2025-06-14 00:29 UTC",
+        "approved": "Yes"
     }
 }
